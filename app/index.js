@@ -1,6 +1,8 @@
 const c_Playing = 0, c_Paused = 1; // game state
 const c_Player = 0, c_Block = 1, c_Bomb = 2; // actor types
 const c_Boardsize = 400, c_Blocksize = c_Boardsize/15;
+const c_Speed = 0.1, c_MaxSpeed = 2;
+const c_KeyList = [ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' ];
 var buildInitialBoard = function() {
 	var board = [];
 	//should be defined in XML
@@ -22,26 +24,10 @@ var actor = function(type, x, y) {
 	    ,isDrawn : false }}
    ,player = function(x, y) {
 	   var p = actor(c_Player, x, y);
-	   p.speed = 3;
+	   p.speed = 0;
 	   p.time = 0;
 	   p.moveAnimSpeed = 1000/15;
 	   p.sprite = 0; 
-	   p.oldpos = p.pos;
-	   eventManager.subscribe(ev_KeyPressed
-						     ,function(direction, value) {
-		 var value = value * p.speed;
-		 p.direction = direction;
-		 switch (direction) {
-		   case c_Left : 
-		   case c_Right : 
-			  p.oldpos.x = p.img.getX();
-			  p.img.setX(p.img.getX() + value); break;
-		   case c_Up   : 
-		   case c_Down : 
-			  p.oldpos.y = p.img.getY();
-			  p.img.setY(p.img.getY() + value); break;
-		 }; });
-
 	   p.img = null;
 	   p.imgLoaded = false;
 	   var offsetX = 6, offsetY = 70, next = 20
@@ -62,6 +48,37 @@ var actor = function(type, x, y) {
 		  }); };
 	   img.src = "img/sprites.png";
 	   return p; }
+   ,calcPosition = function(player) {
+	  var dx = 0, dy = 0;
+	  var valueH = keysDown[c_KeyList[0]] === true ? -1 : 1
+		 ,valueV = keysDown[c_KeyList[2]] === true ? -1 : 1;
+	  if (keysDown[c_KeyList[0]] === true
+	     || keysDown[c_KeyList[1]] === true) {
+		dx = valueH*player.speed; 
+	  } 
+	  if (keysDown[c_KeyList[2]] === true
+	     || keysDown[c_KeyList[3]] === true) {
+		dy = valueV*player.speed; 
+	  }
+	  return [ dx, dy ]; }
+   ,calcSpeed = function(player) {
+		var anyKeyDown = keysDown[c_KeyList[0]] 
+		   || keysDown[c_KeyList[1]] 
+		   || keysDown[c_KeyList[2]] 
+		   || keysDown[c_KeyList[3]]
+	    var speed = 
+		   anyKeyDown ? Math.min(player.speed + c_Speed
+			                    ,c_MaxSpeed)
+		              : 0;
+		return speed; }
+   ,calcDirection = function(oldPos, newPos) {
+	   var x1 = oldPos[0], x2 = x1+newPos[0]
+	      ,y1 = oldPos[1], y2 = y1+newPos[1];
+	   // going up/down
+	   if (Math.abs(x1-x2) < 1) 
+		   return y1 > y2 ? c_Up : c_Down;
+	   else
+		   return x1 > x2 ? c_Left : c_Right; }
    ,block = function(x, y) {
 	   var b = actor(c_Block, x, y);
 	   b.img = "img/block.png";
@@ -106,15 +123,11 @@ var renderBombman = function(stage, layer, bombman) {
 	  layer.add(bombman.img);
 	  bombman.isDrawn == true;
 	}
-	if (bombman.oldpos.x !== bombman.img.getX() ||
-		bombman.oldpos.y !== bombman.img.getY()) {
-		//bombman is walking, show animation
+	if (bombman.speed > 0) {
 		var newStyle = animBombman(bombman.sprite, bombman.direction);
 		bombman.img.crop({
 			x: newStyle[0], y: newStyle[1], 
 			width: newStyle[2], height: newStyle[3] })
-		bombman.oldpos.x = bombman.img.getX();
-		bombman.oldpos.y = bombman.img.getY();
 	}
 
 	layer.draw();
@@ -164,17 +177,16 @@ var updateBombman = function (dt, bombman) {
 
 //  - events
 var keysDown = {}; //this map allows to handle multikey press
-document.addEventListener('keydown', function(event) {
+window.addEventListener('keydown', function(event) {
   const keyName = event.key;
-  const whitelist = [ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' ];
   keysDown[keyName] = true;
-  if (keysDown[whitelist[0]] === true) 
+  if (keysDown[c_KeyList[0]] === true) 
     eventManager.key(c_Left, -1);
-  if (keysDown[whitelist[1]] === true) 
+  if (keysDown[c_KeyList[1]] === true) 
     eventManager.key(c_Right, 1);
-  if (keysDown[whitelist[2]] === true) 
+  if (keysDown[c_KeyList[2]] === true) 
     eventManager.key(c_Up, -1);
-  if (keysDown[whitelist[3]] === true) 
+  if (keysDown[c_KeyList[3]] === true) 
     eventManager.key(c_Down, 1);
 }, false);
 document.addEventListener('keyup', function(event) {
@@ -201,10 +213,22 @@ var update = function(timestamp) {
 
   // draw board
   renderBoard(stage, boardLayer, game.board);
+	
+  // update player pos
+  if (game.player.imgLoaded === true) {
+	  game.player.speed = calcSpeed(game.player);
+	  var newPos = calcPosition(game.player);
+	  game.player.direction = calcDirection(
+		  [game.player.img.getX(), game.player.img.getY()]
+		 ,newPos);
+	  game.player.img.setX(game.player.img.getX() + newPos[0]);
+	  game.player.img.setY(game.player.img.getY() + newPos[1]);
+  }
 
   // draw player
   game.player = updateBombman(dt, game.player);
   renderBombman(stage, playerLayer, game.player);
+
 
   demoCtr += dt;
   //if (demoCtr > demoTime) game.state = c_Paused;
