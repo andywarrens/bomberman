@@ -48,7 +48,7 @@ var actor = function(type, x, y) {
 		  }); };
 	   img.src = "img/sprites.png";
 	   return p; }
-   ,calcPosition = function(player) {
+   ,calcDxDy = function(player) {
 	  var dx = 0, dy = 0;
 	  var valueH = keysDown[c_KeyList[0]] === true ? -1 : 1
 		 ,valueV = keysDown[c_KeyList[2]] === true ? -1 : 1;
@@ -217,7 +217,9 @@ var update = function(timestamp) {
   // update player pos
   if (game.player.imgLoaded === true) {
 	  game.player.speed = calcSpeed(game.player);
-	  var newPos = calcPosition(game.player);
+	  //var newPos = calcDxDy(game.player);
+	  var newPos = getDebugPlayerPos(game.player.img.getX()
+								   ,game.player.img.getY())
 	  game.player.direction = calcDirection(
 		  [game.player.img.getX(), game.player.img.getY()]
 		 ,newPos);
@@ -238,4 +240,26 @@ var update = function(timestamp) {
   }
   lastloop = timestamp
 }
+
+// Debug
+const playerAnimDebug = [ c_Blocksize, 8*c_Blocksize
+					    , 8*c_Blocksize, 8*c_Blocksize ];
+var animCtr = 0;
+var getDebugPlayerPos = function(x, y) {
+	var toX = playerAnimDebug[animCtr],
+		toY = playerAnimDebug[animCtr+1],
+		diff = function(x1, x2) { return Math.abs(x1-x2); }
+	const c_err = 1;
+	if (animCtr > playerAnimDebug.length-1)
+		return [0, 0];
+	else if (diff(x, toX) < c_err && diff(y, toY) < c_err) {
+		animCtr += 2;
+		return [ 0, 0 ];
+	}
+	else {
+		return [ diff(x,toX) < c_err ? 0 : c_MaxSpeed,
+			     diff(y,toY) < c_err ? 0 : c_MaxSpeed ]
+	}
+}
+// Start
 window.requestAnimationFrame(update);
