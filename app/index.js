@@ -1,8 +1,36 @@
+// Helper
+const diff = function(x1, x2) { return Math.abs(x1-x2); }
+const rectCollision = function(r1, r2) {
+   const horizontalOut = ((r1.x+r1.width) < r2.x)
+					  || (r1.x >= (r2.x+r2.width))
+   const verticalOut = ((r1.y+r1.height) < r2.y)
+					 || (r1.y >= (r2.y+r2.height))
+   if (horizontalOut) 
+	   return false;
+   else
+	   return !verticalOut;
+}
+const loadImage = function(src) {
+	var img = new Image();
+    img.onload = function() { imgLoadCtr++; };
+	img.src = src;
+	return img;
+}
+
+// BOMBERMAN GAME
 const c_Playing = 0, c_Paused = 1; // game state
 const c_Player = 0, c_Block = 1, c_Bomb = 2; // actor types
 const c_Blocks = 15, c_Blocksize = 26, c_Boardsize = c_Blocks * c_Blocksize;
 const c_Speed = 0.1, c_MaxSpeed = 2;
-const c_KeyList = [ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' ];
+const c_KeyList = 
+	[ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' 
+	 ,'Control' ];
+
+// load first
+var imgLoadCtr = 0;
+const c_Images = [ loadImage("img/sprites.png")
+				 , loadImage("img/sprites2.png") ]
+     ,c_PlayerImg=0, c_BombImg=1;
 var buildInitialBoard = function() {
 	// init array
     const board = new Array(c_Blocks);
@@ -19,6 +47,7 @@ var buildInitialBoard = function() {
 		var col = blocks[i], row = blocks[i+1];
 		board[row][col] = block(col, row);
 	}
+
 	return board;
 }
 
@@ -43,11 +72,14 @@ var actor = function(type, x, y) {
 		   ,scaledW = scaledH * (width/height);
 	   p.width = scaledW;
 	   p.height = scaledH;
+	   // sprite
+	   const margin = { x: (c_Blocksize - p.width)*0.5
+	                  , y: (c_Blocksize - p.height)*0.5 }
 	   var img = new Image();
 	   img.onload = function() {
 		   p.imgLoaded = true;
 		   p.img = new Konva.Image({
-			x: p.x, y: p.y,
+			x: p.x + margin.x, y: p.y + margin.y,
 			width: p.width, height: p.height,
 			crop: {
 				x: 6, y: 70,
@@ -56,6 +88,19 @@ var actor = function(type, x, y) {
 			image: img
 		  }); };
 	   img.src = "img/sprites.png";
+	   // bomb
+	   var maxBombs = 1
+	      ,bombCtr = 0;
+	   p.bombs = []
+	   const explodeBomb = function() { bombCtr--; }
+	   const dropBomb = function() {
+	     if (bombCtr < maxBombs) {
+			 var myBomb = bomb(p.img.getX(), p.img.getY(), 4000, explodeBomb);
+			 p.bombs[bombCtr] = myBomb;
+			 bombCtr++;
+		 }
+	   }
+	   eventManager.subscribe(ev_BombKey, dropBomb);
 	   return p; }
    ,calcMovement = function(player) {
 	  var dx = 0, dy = 0;
@@ -139,9 +184,65 @@ var actor = function(type, x, y) {
 			});
 	   b.render = function() { return rect; }
 	   return b; }
+    ,bomb = function(x, y, idle, onExplode) {
+	   var b = actor(c_Bomb, 
+		   Math.floor(x / c_Blocksize),
+		   Math.floor(y / c_Blocksize));
+	   // sprite
+	   var offsetX = 3, offsetY = 108, next = 20
+	       ,width = 17, height = 19
+		   ,scaledH = c_Blocksize
+		   ,scaledW = scaledH * (width/height);
+	   b.width = scaledW;
+	   b.height = scaledH;
+	   const margin = { x: (c_Blocksize - b.width)*0.5
+	                  , y: (c_Blocksize - b.height)*0.5 }
+	   b.img = new Konva.Image({
+		x: b.x + margin.x, y: b.y + margin.y,
+		width: b.width, height: b.height,
+		image: c_Images[c_BombImg],
+		crop: {
+			x: offsetX, y: offsetY,
+			width: width, height: height,
+		} });
+		// sprite anim
+	    var bombTimer = 0,
+			idleTime = idle - 1000
+		    currentSprite = 0;
+			// time, offsetX, offsetY, width, height
+		const idleBombKeyframes = [ [ 0  ,  3, 108, 17, 19 ]
+		                           ,[ 500, 23, 108, 17, 19 ] ]
+			 ,explodeKeyframes  = [ [ 0  , 43, 107, 19, 19 ]
+			                       ,[ 500, 65, 107, 19, 19 ]
+			                       ,[ 750, 87, 108, 18, 17 ]
+			                       ,[1000,108, 107, 17, 18 ] ]
+		b.update = function(dt) {
+			bombTimer += dt;
+			var newSprite;
+			if (bombTimer < idleTime) { //bomb is idling
+				newSprite = Math.floor(bombTimer / idleBombKeyframes[1][0]) % 2;
+				keyframes = idleBombKeyframes;
+			} else { //bomb is exploding
+				newSprite = bombTimer < (idle-500) ? 0 :
+							bombTimer < (idle-250) ? 1 :
+							bombTimer < (idle)     ? 2 : 3;
+				keyframes = explodeKeyframes;
+			}
+			if (newSprite !== currentSprite)
+				b.img.crop({
+					x: keyframes[newSprite][1],
+					y: keyframes[newSprite][2], 
+					width: keyframes[newSprite][3],
+					height: keyframes[newSprite][4] });
+			currentSprite = newSprite;
+		}
+									
+
+		return b;
+	}
 	;
 
-const ev_KeyPressed = 0;
+const ev_KeyPressed = 0, ev_BombKey = 1;
 const c_Left=0, c_Right=1, c_Up=2, c_Down=3;
 const eventManager = (function() {
   var my = {}
@@ -150,16 +251,17 @@ const eventManager = (function() {
 	  observers.push({ event: event,
 					   notify: observerFn });
   };
-  my.key = function(direction, value) {
+  my.raiseEvent = function(event, args) {
 	  for (var i=0, n=observers.length; i<n; i++)
-		  if (observers[i].event === ev_KeyPressed)
-			  observers[i].notify(direction, value);
-	  };
+		  if (observers[i].event === event)
+			  observers[i].notify(args);
+  }
   return my;
 })();
    
 var game = {
 	 state  : c_Playing
+	,debug  : false
 	,player : player(1,1) 
 	,board  : buildInitialBoard() }
 
@@ -213,6 +315,13 @@ var renderBoard = function(stage, layer, board) {
 	}
 	layer.draw();
 }
+const renderBomb = function(stage, layer, bomb) {
+	if (bomb.isDrawn === false) { 
+	  layer.add(bomb.img);
+	  bomb.isDrawn == true;
+	}
+	layer.draw();
+}
 
 
 // Controller
@@ -232,13 +341,15 @@ window.addEventListener('keydown', function(event) {
   const keyName = event.key;
   keysDown[keyName] = true;
   if (keysDown[c_KeyList[0]] === true) 
-    eventManager.key(c_Left, -1);
+    eventManager.raiseEvent(ev_KeyPressed, [c_Left, -1]);
   if (keysDown[c_KeyList[1]] === true) 
-    eventManager.key(c_Right, 1);
+    eventManager.raiseEvent(ev_KeyPressed, [c_Right, 1]);
   if (keysDown[c_KeyList[2]] === true) 
-    eventManager.key(c_Up, -1);
+    eventManager.raiseEvent(ev_KeyPressed, [c_Up, -1]);
   if (keysDown[c_KeyList[3]] === true) 
-    eventManager.key(c_Down, 1);
+    eventManager.raiseEvent(ev_KeyPressed, [c_Down, 1]);
+  if (keysDown[c_KeyList[4]] === true) 
+    eventManager.raiseEvent(ev_BombKey);
 
 	// prevent scrolling
   if([32, 37, 38, 39, 40].indexOf(event.keyCode) > -1) {
@@ -251,7 +362,8 @@ document.addEventListener('keyup', function(event) {
 
   //Debug
   switch (event.code) {
-    case 'KeyP': game.state = c_Paused; break;
+    case 'KeyP': game.state = !game.state; break;
+    case 'KeyD': game.debug = !game.debug; break;
   }
 
 }, false);
@@ -277,28 +389,34 @@ var update = function(timestamp) {
   renderBoard(stage, boardLayer, game.board);
 	
   // update player pos
-  if (game.player.imgLoaded === true) {
-	  game.player.speed = calcSpeed(game.player);
-	  const oldPos = {
-		   x: game.player.img.getX()
-	      ,y: game.player.img.getY() }
-	    ,movement = calcMovement(game.player)
-	    //,movement = getDebugMovement(oldPos.x, oldPos.y)
-	    ,newPos = {
-		   x: oldPos.x + movement.x
-		  ,y: oldPos.y + movement.y }
-	    ,validPosObj = getValidPos(game.board, game.player, oldPos, newPos);
-	  const validPos = validPosObj[0]
-	       ,debugRects = validPosObj[1];
+  game.player.speed = calcSpeed(game.player);
+  const oldPos = {
+	   x: game.player.img.getX()
+	  ,y: game.player.img.getY() }
+	,movement = calcMovement(game.player)
+	//,movement = getDebugMovement(oldPos.x, oldPos.y)
+	,newPos = {
+	   x: oldPos.x + movement.x
+	  ,y: oldPos.y + movement.y }
+	,validPosObj = getValidPos(game.board, game.player, oldPos, newPos);
+  const validPos = validPosObj[0]
+	   ,debugRects = validPosObj[1];
+  if (game.debug === true) 
 	  renderDebugCollision(debugRects);
-	  game.player.direction = calcDirection(oldPos, validPos);
-	  game.player.img.setX(validPos.x);
-	  game.player.img.setY(validPos.y);
-  }
+  game.player.direction = calcDirection(oldPos, validPos);
+  game.player.img.setX(validPos.x);
+  game.player.img.setY(validPos.y);
 
   // draw player
   game.player = updateBombman(dt, game.player);
   renderBombman(stage, playerLayer, game.player);
+
+  // draw bombs
+  for (var i=0, n=game.player.bombs.length; i<n; i++) {
+	  var bomb = game.player.bombs[i];
+	  bomb.update(dt);
+	  renderBomb(stage, playerLayer, bomb);
+  }
 
 
   demoCtr += dt;
@@ -354,17 +472,13 @@ const renderDebugCollision = function(rects) {
 			debugLayer.add(toKonvaRect(rects[i]));
 	debugLayer.draw();
 }
-// Helper
-const diff = function(x1, x2) { return Math.abs(x1-x2); }
-const rectCollision = function(r1, r2) {
-   const horizontalOut = ((r1.x+r1.width) < r2.x)
-					  || (r1.x >= (r2.x+r2.width))
-   const verticalOut = ((r1.y+r1.height) < r2.y)
-					 || (r1.y >= (r2.y+r2.height))
-   if (horizontalOut) 
-	   return false;
-   else
-	   return !verticalOut;
-}
+
 // Start
-window.requestAnimationFrame(update);
+var waitWhileLoading = function() {
+	if (imgLoadCtr < c_Images.length) {
+		window.setTimeout(waitWhileLoading, 200);
+	 } else {
+		window.requestAnimationFrame(update);
+	 }
+}
+waitWhileLoading();
