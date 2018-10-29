@@ -19,12 +19,51 @@ const loadImage = function(src) {
 
 // BOMBERMAN GAME
 const c_Playing = 0, c_Paused = 1; // game state
-const c_Player = 0, c_Block = 1, c_Bomb = 2; // actor types
+const c_Player = 0, c_Block = 1, c_Bomb = 2, c_Fire = 3, c_Empty = 4; // actor types
+const renderEmptySquare = function(x,y) { return new Konva.Rect({
+					     x: x, y: y
+						,width: c_Blocksize, height: c_Blocksize
+					    ,fill: 'white' }) };
 const c_Blocks = 15, c_Blocksize = 26, c_Boardsize = c_Blocks * c_Blocksize;
+const c_FireBegin = 0, c_FireMiddle = 1, c_FireEnd = 2;
+const c_FireLeft = 0, c_FireRight = 1, c_FireUp = 2
+	 ,c_FireDown = 3, c_FireMiddleH = 4, c_FireMiddleV = 5
+	 ,c_FireCross = 6;
 const c_Speed = 0.1, c_MaxSpeed = 2;
 const c_KeyList = 
 	[ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' 
 	 ,'Control' ];
+
+// time, offsetX, offsetY, width, height
+const fireKeyframes = new Array(6); //7 possible fire animations, each 4 frames
+fireKeyframes[c_FireLeft] = [ [ 0  , 91, 160, 18, 20 ]
+						,[ 250,111, 160, 19, 20 ] 
+						,[ 500,132, 160, 18, 20 ]
+						,[ 750,154, 160, 18, 20 ] ]
+fireKeyframes[c_FireRight]= [ [ 0  ,  3, 229, 19, 20 ]
+						,[ 250, 23, 229, 19, 20 ] 
+						,[ 500, 44, 229, 20, 20 ]
+						,[ 750, 67, 229, 20, 20 ] ]
+fireKeyframes[c_FireUp]   = [ [ 0  ,  1, 184, 16, 20 ]
+						,[ 250, 15, 184, 17, 20 ] 
+						,[ 500, 33, 184, 20, 20 ]
+						,[ 750, 55, 184, 20, 20 ] ]
+fireKeyframes[c_FireDown] = [ [ 0  ,  1, 204, 16, 20 ]
+						     ,[ 250, 15, 204, 17, 20 ] 
+						     ,[ 500, 33, 204, 20, 20 ]
+						     ,[ 750, 55, 204, 20, 20 ] ]
+fireKeyframes[c_FireMiddleH] = [ [ 0  , 77, 204, 20, 20 ]
+						   ,[ 250, 99, 204, 20, 20 ] 
+						   ,[ 500,121, 204, 20, 20 ]
+						   ,[ 750,143, 204, 20, 20 ] ]
+fireKeyframes[c_FireMiddleV]   = [ [ 0  , 86, 229, 17, 20 ]
+						   ,[ 250,102, 229, 15, 20 ] 
+						   ,[ 500,119, 229, 20, 20 ]
+						   ,[ 750,141, 229, 20, 20 ] ]
+fireKeyframes[c_FireCross]   = [ [ 0  ,  3, 159, 20, 20 ]
+						   ,[ 250, 25, 159, 20, 20 ] 
+						   ,[ 500, 47, 159, 20, 20 ]
+						   ,[ 750, 69, 159, 20, 20 ] ]
 
 // load first
 var imgLoadCtr = 0;
@@ -36,8 +75,8 @@ var buildInitialBoard = function() {
     const board = new Array(c_Blocks);
 	for (var i=0, n=c_Blocks; i<n; i++) {
 		board[i] = new Array(c_Blocks);
-		for (var j=0, n2=c_Blocks; j<n; j++) 
-		  board[i][j] = { type: 'empty' }
+		for (var j=0; j<n; j++) 
+		  board[i][j] = emptyBlock(j, i);
 	}
 
 	//map design: should be defined in XML
@@ -48,6 +87,10 @@ var buildInitialBoard = function() {
 		board[row][col] = block(col, row);
 	}
 
+	//fire
+	//board[1][3] = fire(3, 1, c_FireBegin, c_FireLeft);
+	//board[1][4] = fire(4, 1, c_FireMiddle, c_FireMiddleH);
+	//board[1][5] = fire(5, 1, c_FireEnd, c_FireRight);
 	return board;
 }
 
@@ -63,6 +106,7 @@ var actor = function(type, x, y) {
 	   p.speed = 0;
 	   p.time = 0;
 	   p.moveAnimSpeed = 1000/15;
+	   p.bombStrength = 5;
 	   p.sprite = 0; 
 	   p.img = null;
 	   p.imgLoaded = false;
@@ -91,12 +135,17 @@ var actor = function(type, x, y) {
 	   // bomb
 	   var maxBombs = 1
 	      ,bombCtr = 0;
-	   p.bombs = []
-	   const explodeBomb = function() { bombCtr--; }
+	   const explodeBomb = function(myBomb) { 
+		   bombCtr--; 
+		   myBomb.bombStrength = p.bombStrength;
+	   }
 	   const dropBomb = function() {
 	     if (bombCtr < maxBombs) {
-			 var myBomb = bomb(p.img.getX(), p.img.getY(), 4000, explodeBomb);
-			 p.bombs[bombCtr] = myBomb;
+			 const moPlayer = {
+				 x: Math.floor((p.img.getX() + p.width/2) / c_Blocksize)
+				,y: Math.floor((p.img.getY() + p.height/2) / c_Blocksize) }
+			 var myBomb = bomb(moPlayer.x, moPlayer.y, 4000 ,explodeBomb);
+			 game.board[moPlayer.y][moPlayer.x] = myBomb;
 			 bombCtr++;
 		 }
 	   }
@@ -170,6 +219,11 @@ var actor = function(type, x, y) {
 	   blocks.push(playerRect);
 	   return (i!==n) ? [oldPos, blocks] : [newPos, blocks];
 	}
+   ,emptyBlock = function(x, y) {
+	   var b = actor(c_Empty, x, y);
+	   b.render = function() { return renderEmptySquare(b.x, b.y); }
+	   return b;
+   }
    ,block = function(x, y) {
 	   var b = actor(c_Block, x, y);
 	   b.img = "img/block.png";
@@ -185,9 +239,9 @@ var actor = function(type, x, y) {
 	   b.render = function() { return rect; }
 	   return b; }
     ,bomb = function(x, y, idle, onExplode) {
-	   var b = actor(c_Bomb, 
-		   Math.floor(x / c_Blocksize),
-		   Math.floor(y / c_Blocksize));
+	   var b = actor(c_Bomb, x, y);
+	   b.isExploded = false;
+	   b.bombStrength = 1;
 	   // sprite
 	   var offsetX = 3, offsetY = 108, next = 20
 	       ,width = 17, height = 19
@@ -197,6 +251,7 @@ var actor = function(type, x, y) {
 	   b.height = scaledH;
 	   const margin = { x: (c_Blocksize - b.width)*0.5
 	                  , y: (c_Blocksize - b.height)*0.5 }
+	   b.render = function() { return b.img; };
 	   b.img = new Konva.Image({
 		x: b.x + margin.x, y: b.y + margin.y,
 		width: b.width, height: b.height,
@@ -216,30 +271,91 @@ var actor = function(type, x, y) {
 			                       ,[ 500, 65, 107, 19, 19 ]
 			                       ,[ 750, 87, 108, 18, 17 ]
 			                       ,[1000,108, 107, 17, 18 ] ]
+		     ,endKeyframes      = [ [   0,130, 107, 17, 18 ] 
+			                       ,[ 250,152, 107, 17, 18 ] 
+			                       ,[ 500,174, 107, 17, 18 ] 
+			                       ,[ 750,196, 107, 17, 18 ] ]
 		b.update = function(dt) {
 			bombTimer += dt;
 			var newSprite;
 			if (bombTimer < idleTime) { //bomb is idling
-				newSprite = Math.floor(bombTimer / idleBombKeyframes[1][0]) % 2;
+				newSprite = Math.floor(bombTimer / 500) % 2;
 				keyframes = idleBombKeyframes;
-			} else { //bomb is exploding
+			} else if (bombTimer <= idle) { //bomb is exploding
 				newSprite = bombTimer < (idle-500) ? 0 :
 							bombTimer < (idle-250) ? 1 :
 							bombTimer < (idle)     ? 2 : 3;
 				keyframes = explodeKeyframes;
+				if (b.isExploded === false && newSprite===1) {
+					onExplode(b);
+					b.isExploded = true;
+				}
 			}
-			if (newSprite !== currentSprite)
-				b.img.crop({
-					x: keyframes[newSprite][1],
-					y: keyframes[newSprite][2], 
-					width: keyframes[newSprite][3],
-					height: keyframes[newSprite][4] });
-			currentSprite = newSprite;
+			if (bombTimer <= idle 
+			    && newSprite !== currentSprite) {
+			  b.img.crop({
+			  	x: keyframes[newSprite][1],
+			  	y: keyframes[newSprite][2], 
+			  	width: keyframes[newSprite][3],
+			  	height: keyframes[newSprite][4] });
+			  currentSprite = newSprite;
+			}
 		}
 									
 
 		return b;
 	}
+   ,fire = function(x, y, fireDirection) {
+	   var f = actor(c_Fire, x, y);
+
+	   // sprite
+	   const height = 20
+	        ,width  = 20 //usually
+		    ,scaledH = c_Blocksize
+		    ,scaledW = scaledH * (width/height);
+	   f.width = scaledW;
+	   f.height = scaledH;
+	   const margin = { x: (c_Blocksize - f.width)*0.5
+	                  , y: (c_Blocksize - f.height)*0.5 }
+	   f.img = new Konva.Image({
+		x: f.x + margin.x, y: f.y + margin.y,
+		width: f.width, height: f.height,
+		image: c_Images[c_BombImg], // this is sprite2
+		crop: {
+			x: fireKeyframes[c_FireLeft][0][1]
+		   ,y: fireKeyframes[c_FireLeft][0][2]
+		   ,width: fireKeyframes[c_FireLeft][0][3]
+		   ,height: fireKeyframes[c_FireLeft][0][4]
+		} });
+	   f.render = function() { return f.img; }
+
+	   // sprite anim
+	   var animTimer = 0,
+		   currentSprite = -1;
+		f.update = function(dt) {
+			animTimer += dt;
+			if (animTimer < 1050) {		
+				var newSprite = 
+					        animTimer < 150 ? 0 :
+				            animTimer < 300  ? 1 :
+							animTimer < 450  ? 2 : 
+							animTimer < 600 ? 3 :
+							animTimer < 750 ? 2 :
+							animTimer < 900 ? 1 : 0;
+				if (newSprite !== currentSprite)
+					f.img.crop({
+						x:      fireKeyframes[fireDirection][newSprite][1],
+						y:      fireKeyframes[fireDirection][newSprite][2], 
+						width:  fireKeyframes[fireDirection][newSprite][3],
+						height: fireKeyframes[fireDirection][newSprite][4] });
+				currentSprite = newSprite;
+			} else { 
+				f.isDestroyed = true;
+			}
+
+		}
+	   return f;
+    }
 	;
 
 const ev_KeyPressed = 0, ev_BombKey = 1;
@@ -307,7 +423,27 @@ var renderBoard = function(stage, layer, board) {
 					board[i][j].isDrawn = true;
 				}
 				break;
-			  case 'empty': break;
+			  case c_Bomb :
+				if (board[i][j].isDrawn === false) {
+					var rect = board[i][j].render();
+					layer.add(rect);
+					board[i][j].isDrawn = true;
+				} 
+				break;
+			  case c_Fire:
+				if (board[i][j].isDrawn === false) {
+					var rect = board[i][j].render();
+					layer.add(rect);
+					board[i][j].isDrawn = true;
+				} 
+				break;
+			  case c_Empty: 
+				if (board[i][j].isDrawn === false) {
+					var rect = board[i][j].render();
+					layer.add(rect);
+					board[i][j].isDrawn = true;
+				} 
+				break;
 			  default :
 				console.log('unknown type in board', board[i][j]);
 			}
@@ -315,14 +451,6 @@ var renderBoard = function(stage, layer, board) {
 	}
 	layer.draw();
 }
-const renderBomb = function(stage, layer, bomb) {
-	if (bomb.isDrawn === false) { 
-	  layer.add(bomb.img);
-	  bomb.isDrawn == true;
-	}
-	layer.draw();
-}
-
 
 // Controller
 //  - updates
@@ -333,6 +461,64 @@ var updateBombman = function (dt, bombman) {
 		bombman.time = 0;
 	}
 	return bombman;
+}
+const updateBoard = function(board, dt) {
+	for (var i=0, n=c_Blocks; i<n; i++) {
+	  for (var j=0; j<n; j++) {
+	    switch (board[i][j].type) {
+		  case c_Bomb:
+			var myBomb = board[i][j];
+		    myBomb.update(dt);
+			if (myBomb.isExploded) {
+			   addExplosion(game.board, j, i, myBomb.bombStrength);
+			}
+			break;
+		  case c_Fire:
+			board[i][j].update(dt); 
+			if (board[i][j].isDestroyed) {
+			  board[i][j] = emptyBlock(j,i);
+			}
+			break;
+		}
+	  }
+	}
+}
+const addExplosion = function(board, col, row, range) {
+    const halfway = Math.floor(0.5*range);
+	// go left
+	var i = 1;
+	while (i<halfway && board[row][col-i].type !== c_Block) {
+		board[row][col-i] = fire(col-i, row, c_FireMiddleH);
+		i++;
+	}
+	if (board[row][col-i].type !== c_Block)
+	  board[row][col-i] = fire(col-i, row, c_FireLeft);
+	// go right
+	i = 1;
+	while (i<halfway && board[row][col+i].type !== c_Block) {
+		board[row][col+i] = fire(col+i, row, c_FireMiddleH);
+		i++;
+	}
+	if (board[row][col+i].type !== c_Block)
+	  board[row][col+i] = fire(col+i, row, c_FireRight);
+	// go up
+	i = 1;
+	while (i<halfway && board[row-i][col].type !== c_Block) {
+		board[row-i][col] = fire(col, row-i, c_FireMiddleV);
+		i++;
+	}
+	if (board[row-i][col].type !== c_Block)
+	  board[row-i][col] = fire(col, row-i, c_FireUp);
+	// go down
+	i = 1;
+	while (i<halfway && board[row+i][col].type !== c_Block) {
+		board[row+i][col] = fire(col, row+i, c_FireMiddleV);
+		i++;
+	}
+	if (board[row+i][col].type !== c_Block)
+	  board[row+i][col] = fire(col, row+i, c_FireDown);
+	// cross
+    board[row][col] = fire(col, row, c_FireCross);
 }
 
 //  - events
@@ -370,7 +556,7 @@ document.addEventListener('keyup', function(event) {
 
 var  lastloop = null;
 
-const demoTime = 5*1000; //ms
+const demoTime = 12*1000; //ms
 var demoCtr = 0;
 
 var elBombman = document.getElementById('bomberman');
@@ -385,20 +571,32 @@ stage.add(boardLayer, playerLayer);
 var update = function(timestamp) {
   dt = timestamp - lastloop;
 
-  // draw board
+  // DRAW
   renderBoard(stage, boardLayer, game.board);
+  renderBombman(stage, playerLayer, game.player);
+
+  // UPDATE
+  // update board
+  updateBoard(game.board, dt);
 	
   // update player pos
   game.player.speed = calcSpeed(game.player);
   const oldPos = {
 	   x: game.player.img.getX()
 	  ,y: game.player.img.getY() }
-	,movement = calcMovement(game.player)
-	//,movement = getDebugMovement(oldPos.x, oldPos.y)
+	//,movement = calcMovement(game.player)
+	,movement = getDebugMovement(oldPos.x, oldPos.y)
 	,newPos = {
 	   x: oldPos.x + movement.x
 	  ,y: oldPos.y + movement.y }
 	,validPosObj = getValidPos(game.board, game.player, oldPos, newPos);
+
+  // debug
+  if (dropBombsDebug.length > 0 && !(dropBombsDebug[0] > demoCtr)) {
+	  dropBombsDebug.shift();
+	  eventManager.raiseEvent(ev_BombKey);
+  }
+
   const validPos = validPosObj[0]
 	   ,debugRects = validPosObj[1];
   if (game.debug === true) 
@@ -406,21 +604,10 @@ var update = function(timestamp) {
   game.player.direction = calcDirection(oldPos, validPos);
   game.player.img.setX(validPos.x);
   game.player.img.setY(validPos.y);
-
-  // draw player
   game.player = updateBombman(dt, game.player);
-  renderBombman(stage, playerLayer, game.player);
-
-  // draw bombs
-  for (var i=0, n=game.player.bombs.length; i<n; i++) {
-	  var bomb = game.player.bombs[i];
-	  bomb.update(dt);
-	  renderBomb(stage, playerLayer, bomb);
-  }
-
 
   demoCtr += dt;
-  //if (demoCtr > demoTime) game.state = c_Paused;
+  if (demoCtr > demoTime) game.state = c_Paused;
 
   if (game.state == c_Playing) {
     window.requestAnimationFrame(update);
@@ -431,17 +618,17 @@ var update = function(timestamp) {
 }
 
 // Debug
-const playerAnimDebug = [ c_Blocksize, 9*c_Blocksize //coll
+const playerAnimDebug = [ c_Blocksize, 8*c_Blocksize 
 						, c_Blocksize, c_Blocksize
-						, 2*c_Blocksize, c_Blocksize 
-						, 2*c_Blocksize, 9*c_Blocksize //coll
-						, 3*c_Blocksize, c_Blocksize
-					    , 3*c_Blocksize, 9*c_Blocksize  //coll
+						, 3*c_Blocksize, c_Blocksize 
+					    , 3*c_Blocksize, 8*c_Blocksize  
 					    , 8*c_Blocksize, 8*c_Blocksize ]; 
+const dropBombsDebug = [ 2000, 7000 ];
 var animCtr = 0;
 var getDebugMovement = function(x, y) {
 	var toX = playerAnimDebug[animCtr],
 		toY = playerAnimDebug[animCtr+1];
+
 	const c_err = 1;
 	if (animCtr > playerAnimDebug.length-1)
 		return { x: 0, y: 0 };
@@ -479,6 +666,11 @@ var waitWhileLoading = function() {
 		window.setTimeout(waitWhileLoading, 200);
 	 } else {
 		window.requestAnimationFrame(update);
+//addExplosion(game.board, 3, 4, 5);
+//addExplosion(game.board, 6, 7, 5);
+//addExplosion(game.board, 4, 1, 5);
+//updateBoard(game.board, 0);
+//renderBoard(stage, boardLayer, game.board);
 	 }
 }
 waitWhileLoading();
