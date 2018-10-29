@@ -1,0 +1,20 @@
+{
+  "name": "bomberman-js",
+  "version": "1.0.0",
+  "description": "browser-sync start --port 35729 --server --files *",
+  "main": "app/index.js",
+  "dependencies": {
+    "konva": "^2.5.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://warrean@bitbucket.org/warrean/bomberman-js.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/warrean/bomberman-js#readme"
+}
