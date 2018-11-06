@@ -116,6 +116,19 @@ var actor = function(type, x, y) {
 		   ,scaledW = scaledH * (width/height);
 	   p.width = scaledW;
 	   p.height = scaledH;
+
+	   // collision
+	   p.isAlive = true;
+	   p.getRect = function(pos) {
+		   const middlePlayer = {
+				   x: pos.x + (0.5*p.width)
+				  ,y: pos.y + (0.5*p.height)  }
+		   return playerRect = {
+				   x: middlePlayer.x - 0.5*p.width
+				  ,y: middlePlayer.y - 0.5*p.height +2
+				  ,width: player.width 
+				  ,height: player.height -4 }; }
+
 	   // sprite
 	   const margin = { x: (c_Blocksize - p.width)*0.5
 	                  , y: (c_Blocksize - p.height)*0.5 }
@@ -132,6 +145,7 @@ var actor = function(type, x, y) {
 			image: img
 		  }); };
 	   img.src = "img/sprites.png";
+
 	   // bomb
 	   var maxBombs = 1
 	      ,bombCtr = 0;
@@ -150,6 +164,33 @@ var actor = function(type, x, y) {
 		 }
 	   }
 	   eventManager.subscribe(ev_BombKey, dropBomb);
+
+	   // animation
+	   const deadKeyframe = [ [   0,  3, 75, 19, 26 ]
+	                        , [ 250, 25, 75, 19, 26 ]
+	                        , [ 500, 47, 75, 19, 26 ]
+	                        , [ 750, 69, 75, 19, 24 ]
+	                        , [1000, 91, 75, 19, 25 ]
+	                        , [1250,113, 73, 19, 24 ]
+	                        , [1500,135, 78, 19, 18 ] ];
+	   var animTimer = 0
+	      ,currentSprite = -1;
+	   p.update = function(dt) {
+		 animTimer += dt;
+		 if (p.isAlive === false && animTimer < 1500) {
+		   var newSprite = Math.floor(animTimer / 250)
+			  ,keyframes = deadKeyframe;
+		   if (newSprite !== currentSprite) {
+			  p.img.image(c_Images[c_BombImg]); // bad name
+			  p.img.crop({
+			  	x: keyframes[newSprite][1],
+			  	y: keyframes[newSprite][2], 
+			  	width: keyframes[newSprite][3],
+			  	height: keyframes[newSprite][4] });
+			  currentSprite = newSprite;
+		   }
+	     }
+	   }
 	   return p; }
    ,calcMovement = function(player) {
 	  var dx = 0, dy = 0;
@@ -186,41 +227,23 @@ var actor = function(type, x, y) {
 	   // determine on which blocks (max 4) the player is
 	   // e.g. standing in middle of horizontal row
 	   // and trying to go up (=4), or left (=2)
-	   const tl = { x: Math.floor(newPos.x / c_Blocksize)
-				   ,y: Math.floor(newPos.y / c_Blocksize) }
-	        ,tr = { x: Math.floor((newPos.x+player.width) / c_Blocksize)
-				   ,y: tl.y }
-	        ,bl = { x: tl.x
-				   ,y: Math.floor((newPos.y+player.height) / c_Blocksize) }
-	        ,br = { x: tr.x
-				   ,y: bl.y }
-	   var blocks = [
-		   board[tl.y][tl.x],
-		   board[tr.y][tr.x],
-		   board[bl.y][bl.x],
-		   board[br.y][br.x] ]
+	   const blocks = 
+		   getBlocksUnderneathPlayer(board, newPos, player)
 
 	   // if theres collision with the adjacent block 
 	   // then return oldPos
-	   const middlePlayer = {
-			   x: newPos.x + (0.5*player.width)
-			  ,y: newPos.y + (0.5*player.height)  }
-	        ,playerRect = {
-			   x: middlePlayer.x - 0.5*player.width
-			  ,y: middlePlayer.y - 0.5*player.height +2
-			  ,width: player.width 
-			  ,height: player.height -4 }
-
+	   const playerRect = player.getRect(newPos);
 	   var i=0, n=blocks.length;
 	   while (i<n && 
 		   (blocks[i].type !== c_Block || rectCollision(blocks[i], playerRect) === false))
 		   i++;
 
 	   blocks.push(playerRect);
-	   return (i!==n) ? [oldPos, blocks] : [newPos, blocks];
+	   return (i!==n) ? oldPos : newPos;
 	}
    ,emptyBlock = function(x, y) {
 	   var b = actor(c_Empty, x, y);
+	   b.width = b.height = c_Blocksize
 	   b.render = function() { return renderEmptySquare(b.x, b.y); }
 	   return b;
    }
@@ -384,20 +407,18 @@ var game = {
 
 // View
 var renderBombman = function(stage, layer, bombman) {
-  if (bombman.imgLoaded === true) {
-	if (bombman.isDrawn === false) { 
-	  layer.add(bombman.img);
-	  bombman.isDrawn == true;
-	}
-	if (bombman.speed > 0) {
-		var newStyle = animBombman(bombman.sprite, bombman.direction);
-		bombman.img.crop({
-			x: newStyle[0], y: newStyle[1], 
-			width: newStyle[2], height: newStyle[3] })
-	}
-
-	layer.draw();
+  if (bombman.isDrawn === false) { 
+    layer.add(bombman.img);
+    bombman.isDrawn == true;
   }
+  if (bombman.isAlive && bombman.speed > 0) {
+  	var newStyle = animBombman(bombman.sprite, bombman.direction);
+  	bombman.img.crop({
+  		x: newStyle[0], y: newStyle[1], 
+  		width: newStyle[2], height: newStyle[3] })
+  }
+  
+  layer.draw();
 }
 var animBombman = (function() {
 	const width = 18, height = 26, next=20;
@@ -462,6 +483,20 @@ var updateBombman = function (dt, bombman) {
 	}
 	return bombman;
 }
+const getBlocksUnderneathPlayer = 
+	function(board, pos, player) {
+	   const tl = { x: Math.floor(pos.x / c_Blocksize)
+				   ,y: Math.floor(pos.y / c_Blocksize) }
+	        ,tr = { x: Math.floor((pos.x+player.width) / c_Blocksize)
+				   ,y: tl.y }
+	        ,bl = { x: tl.x
+				   ,y: Math.floor((pos.y+player.height) / c_Blocksize) }
+	        ,br = { x: tr.x
+				   ,y: bl.y }
+	   return  [ board[tl.y][tl.x],
+		         board[tr.y][tr.x],
+		         board[bl.y][bl.x],
+		         board[br.y][br.x] ]; }
 const updateBoard = function(board, dt) {
 	for (var i=0, n=c_Blocks; i<n; i++) {
 	  for (var j=0; j<n; j++) {
@@ -548,8 +583,16 @@ document.addEventListener('keyup', function(event) {
 
   //Debug
   switch (event.code) {
-    case 'KeyP': game.state = !game.state; break;
-    case 'KeyD': game.debug = !game.debug; break;
+    case 'KeyP': 
+		  game.state = (game.state === c_Playing) ? c_Paused : c_Playing;
+		  console.log('Pause:', game.state === c_Paused);
+		  if (game.state === c_Playing) 
+			window.requestAnimationFrame(update);
+		  break;
+	case 'KeyD': 
+		  game.debug = !game.debug; 
+		  console.log('Debug:', game.debug);
+		  break;
   }
 
 }, false);
@@ -565,8 +608,9 @@ const stage = new Konva.Stage({
 		,width     : c_Boardsize
 		,height    : c_Boardsize })
      ,boardLayer = new Konva.Layer()
-	 ,playerLayer = new Konva.Layer();
-stage.add(boardLayer, playerLayer);
+	 ,playerLayer = new Konva.Layer()
+     ,debugLayer = new Konva.Layer();
+stage.add(boardLayer, playerLayer, debugLayer);
 
 var update = function(timestamp) {
   dt = timestamp - lastloop;
@@ -580,36 +624,56 @@ var update = function(timestamp) {
   updateBoard(game.board, dt);
 	
   // update player pos
-  game.player.speed = calcSpeed(game.player);
-  const oldPos = {
-	   x: game.player.img.getX()
-	  ,y: game.player.img.getY() }
-	//,movement = calcMovement(game.player)
-	,movement = getDebugMovement(oldPos.x, oldPos.y)
-	,newPos = {
-	   x: oldPos.x + movement.x
-	  ,y: oldPos.y + movement.y }
-	,validPosObj = getValidPos(game.board, game.player, oldPos, newPos);
+  if (game.player.isAlive === true) {
+	  game.player.speed = calcSpeed(game.player);
+	  const oldPos = {
+		   x: game.player.img.getX()
+		  ,y: game.player.img.getY() }
+		,movement = calcMovement(game.player)
+		//,movement = getDebugMovement(oldPos.x, oldPos.y)
+		,newPos = {
+		   x: oldPos.x + movement.x
+		  ,y: oldPos.y + movement.y }
+		,validPos = getValidPos(game.board, game.player, oldPos, newPos);
+	  game.player.direction = calcDirection(oldPos, validPos);
+	  game.player.img.setX(validPos.x);
+	  game.player.img.setY(validPos.y);
+	  game.player = updateBombman(dt, game.player);
+
+	  // check if player is hit by fire
+	  const pcol = Math.floor(validPos.x / c_Blocksize)
+		   ,prow =  Math.floor(validPos.y / c_Blocksize)
+		   ,blocks = getBlocksUnderneathPlayer(game.board, validPos, game.player)
+		   ,playerRect = game.player.getRect(validPos);
+	   var i=0, n=blocks.length;
+	   while (i<n && blocks[i].type !== c_Fire)
+		   i++;
+	   if (i!==n)
+		 game.player.isAlive = false;
+
+	  if (game.debug === true) 
+		  renderDebugCollision(blocks);
+  } else {
+	  game.player.update(dt); // update dead animation
+  } 
+
+  if (demoCtr !== -1) {
+	if (demoCtr > demoTime) {
+	  game.state = c_Paused;
+	  demoCtr = -1;
+    } else
+	  demoCtr += dt;
+  }
+
 
   // debug
   if (dropBombsDebug.length > 0 && !(dropBombsDebug[0] > demoCtr)) {
 	  dropBombsDebug.shift();
-	  eventManager.raiseEvent(ev_BombKey);
+	  //eventManager.raiseEvent(ev_BombKey);
   }
 
-  const validPos = validPosObj[0]
-	   ,debugRects = validPosObj[1];
-  if (game.debug === true) 
-	  renderDebugCollision(debugRects);
-  game.player.direction = calcDirection(oldPos, validPos);
-  game.player.img.setX(validPos.x);
-  game.player.img.setY(validPos.y);
-  game.player = updateBombman(dt, game.player);
 
-  demoCtr += dt;
-  if (demoCtr > demoTime) game.state = c_Paused;
-
-  if (game.state == c_Playing) {
+  if (game.state === c_Playing) {
     window.requestAnimationFrame(update);
   }
   else console.log('game is paused');
@@ -623,7 +687,7 @@ const playerAnimDebug = [ c_Blocksize, 8*c_Blocksize
 						, 3*c_Blocksize, c_Blocksize 
 					    , 3*c_Blocksize, 8*c_Blocksize  
 					    , 8*c_Blocksize, 8*c_Blocksize ]; 
-const dropBombsDebug = [ 2000, 7000 ];
+const dropBombsDebug = [ 0, 7000 ];
 var animCtr = 0;
 var getDebugMovement = function(x, y) {
 	var toX = playerAnimDebug[animCtr],
@@ -643,20 +707,17 @@ var getDebugMovement = function(x, y) {
 			    ,y: diff(y,toY) < c_err ? 0 : dy*c_MaxSpeed }
 	}
 }
-const debugLayer = new Konva.Layer()
-     ,toKonvaRect = function(rect) { return new Konva.Rect({
+const toKonvaRect = function(rect) { return new Konva.Rect({
 			  x: rect.x, y: rect.y,
 			  width: rect.width, height: rect.height,
-			  fill: 'rgba(0,0,0,0)',
+			  fill: 'rgba(99,99,99,0.5)',
 			  stroke: 'red',
 			  strokeWidth: 1
 	 })};
-stage.add(debugLayer);
 const renderDebugCollision = function(rects) {
 	debugLayer.destroyChildren();
 	for (var i=0, n=rects.length; i<n; i++)
-		if (rects[i].type !== "empty")
-			debugLayer.add(toKonvaRect(rects[i]));
+	  debugLayer.add(toKonvaRect(rects[i]));
 	debugLayer.draw();
 }
 
