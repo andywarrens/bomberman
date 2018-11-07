@@ -19,7 +19,7 @@ const loadImage = function(src) {
 
 // BOMBERMAN GAME
 const c_Playing = 0, c_Paused = 1; // game state
-const c_Player = 0, c_Block = 1, c_Bomb = 2, c_Fire = 3, c_Empty = 4; // actor types
+const c_Player = 0, c_Block = 1, c_Bomb = 2, c_Fire = 3, c_Empty = 4, c_Brick = 5; // actor types
 const renderEmptySquare = function(x,y) { return new Konva.Rect({
 					     x: x, y: y
 						,width: c_Blocksize, height: c_Blocksize
@@ -81,8 +81,9 @@ fireKeyframes[c_FireCross]   = [ [ 0  ,  3, 159, 20, 20 ]
 // load first
 var imgLoadCtr = 0;
 const c_Images = [ loadImage("img/sprites.png")
-				 , loadImage("img/sprites2.png") ]
-     ,c_PlayerImg=0, c_BombImg=1;
+				 , loadImage("img/sprites2.png") 
+				 , loadImage("img/bricks.png") ]
+     ,c_PlayerImg=0, c_BombImg=1, c_BrickImg=2;
 var buildInitialBoard = function() {
 	// init array
     const board = new Array(c_Blocks);
@@ -104,6 +105,13 @@ var buildInitialBoard = function() {
 	//board[1][3] = fire(3, 1, c_FireBegin, c_FireLeft);
 	//board[1][4] = fire(4, 1, c_FireMiddle, c_FireMiddleH);
 	//board[1][5] = fire(5, 1, c_FireEnd, c_FireRight);
+	
+	//bricks
+	var bricks = [ 3,1, 3,2, 3,3, 6,3, 5,4, 6,4 ];
+	for (var i=0, n=bricks.length; i<n; i+=2) {
+		var col = bricks[i], row = bricks[i+1];
+		board[row][col] = brick(col, row);
+	}
 	return board;
 }
 
@@ -251,7 +259,9 @@ var actor = function(type, x, y) {
 	   const playerRect = player.getRect(newPos);
 	   var i=0, n=blocks.length;
 	   while (i<n && 
-		   (blocks[i].type !== c_Block || rectCollision(blocks[i], playerRect) === false))
+		   ( (blocks[i].type !== c_Block
+			  && blocks[i].type !== c_Brick)
+			|| rectCollision(blocks[i], playerRect) === false))
 		   i++;
 
 	   blocks.push(playerRect);
@@ -277,6 +287,61 @@ var actor = function(type, x, y) {
 			});
 	   b.render = function() { return rect; }
 	   return b; }
+    ,brick = function(x, y) {
+	   var b = actor(c_Brick, x, y);
+	   b.img = "img/bricks.png";
+	   b.isDestroyed = false;
+	   // time, offsetX, offsetY, width, height
+	   const keyframes = [ [   0, 63, 48, 15, 15 ]
+	                              ,[   1, 79, 48, 15, 15 ] 
+	                              ,[ 250, 94, 48, 15, 15 ] 
+	                              ,[ 500,109, 48, 15, 15 ] 
+	                              ,[ 750,124, 48, 15, 15 ] 
+	                              ,[1000,139, 48, 15, 15 ] 
+	                              ,[1250,154, 48, 15, 15 ] ]
+	   const scaledH = c_Blocksize
+		    ,scaledW = c_Blocksize;
+	   b.width = scaledW;
+	   b.height = scaledH;
+	   b.img = new Konva.Image({
+		x: b.x, y: b.y,
+		width: b.width, height: b.height,
+		image: c_Images[c_BrickImg],
+		crop: {
+			x: keyframes[0][1],
+			y: keyframes[0][2],
+			width: keyframes[0][3],
+			height: keyframes[0][4]
+		} });
+	   b.render = function() { return b.img; };
+
+	   // animate when a fire destroys the brick
+	   b.break = function() { b.isDestroyed = true; }
+	   var animTimer = 0
+		  ,sprite = 0
+		  ,nextFrameTime = keyframes[sprite+1][0];
+	   b.update = function(dt) {
+	     if (b.isDestroyed === false) return;
+		 animTimer += dt;
+		 if (animTimer < nextFrameTime) return;
+		 if (sprite === keyframes.length) {
+			 b.isFinished = true;
+		 } else {
+		   sprite++;
+		   if (sprite === keyframes.length) {
+			   nextFrameTime = 250; // leave last sprite 250ms
+		   } else {
+			   nextFrameTime = keyframes[sprite][0];
+			   b.img.crop({
+				 x: keyframes[sprite][1],
+				 y: keyframes[sprite][2], 
+				 width: keyframes[sprite][3],
+				 height: keyframes[sprite][4] });
+		  }
+		 }
+	   }
+	   return b;
+	}
     ,bomb = function(x, y, idle, onExplode) {
 	   var b = actor(c_Bomb, x, y);
 	   b.isExploded = false;
@@ -457,33 +522,13 @@ var renderBoard = function(stage, layer, board) {
 	for (var i=0, n=board.length; i<n; i++) {
 		for (var j=0, n2=board[i].length; j<n2; j++) {
 			switch (board[i][j].type) {
-			  case c_Block : 
-				if (board[i][j].isDrawn === false) {
-					var rect = board[i][j].render();
-					layer.add(rect);
-					board[i][j].isDrawn = true;
-				}
-				break;
-			  case c_Bomb :
-				if (board[i][j].isDrawn === false) {
-					var rect = board[i][j].render();
-					layer.add(rect);
-					board[i][j].isDrawn = true;
-				} 
-				break;
-			  case c_Fire:
-				if (board[i][j].isDrawn === false) {
-					var rect = board[i][j].render();
-					layer.add(rect);
-					board[i][j].isDrawn = true;
-				} 
-				break;
-			  case c_Empty: 
-				if (board[i][j].isDrawn === false) {
-					var rect = board[i][j].render();
-					layer.add(rect);
-					board[i][j].isDrawn = true;
-				} 
+			  case c_Brick :
+			  case c_Block :
+			  case c_Bomb  :
+			  case c_Fire  :
+			  case c_Empty :
+				if (board[i][j].isDrawn === false)
+					drawBoardElement(layer, board[i][j]);
 				break;
 			  default :
 				console.log('unknown type in board', board[i][j]);
@@ -491,6 +536,13 @@ var renderBoard = function(stage, layer, board) {
 		}
 	}
 	layer.draw();
+}
+const drawBoardElement = function(layer, el) {
+  if (el.isDrawn === false) {
+  	var rect = el.render();
+  	layer.add(rect);
+  	el.isDrawn = true;
+  } 
 }
 
 // Controller
@@ -571,44 +623,49 @@ const updateBoard = function(board, dt) {
 			  board[i][j] = emptyBlock(j,i);
 			}
 			break;
+		  case c_Brick:
+		    board[i][j].update(dt);
+			if (board[i][j].isFinished) {
+			  board[i][j] = emptyBlock(j,i);
+			}
+			break;
 		}
 	  }
 	}
 }
 const addExplosion = function(board, col, row, range) {
     const halfway = Math.floor(0.5*range);
+
+	const addFire = function(rowInc, colInc, firemiddle, fireend) {
+		var i = 1;
+		while (i<=halfway && 
+			[c_Block, c_Brick].indexOf(
+				board[row+rowInc*i][col+colInc*i].type)
+			  === -1) {
+		  board[row+rowInc*i][col+colInc*i] = 
+			fire(col+i*colInc, row+i*rowInc, firemiddle);
+		  i++;
+		}
+		// if the fire encountered a brick, break it
+		if (i<=halfway) {
+			var el = board[row+rowInc*i][col+colInc*i];
+			if (el.type === c_Brick) {
+			  console.log('brick found', row+rowInc*i, col+colInc*i);
+			  board[row+rowInc*i][col+colInc*i].break();
+			}
+		}
+		// if it was a full explosion
+		//  give the last block an 'end' image
+		var el = board[row+rowInc*i][col+colInc*i];
+		if (el.type !== c_Block && el.type !== c_Brick)
+		  board[row+rowInc*i][col+colInc*i] = 
+			fire(col+i*colInc, row+i*rowInc, fireend);
+	}
 	// go left
-	var i = 1;
-	while (i<halfway && board[row][col-i].type !== c_Block) {
-		board[row][col-i] = fire(col-i, row, c_FireMiddleH);
-		i++;
-	}
-	if (board[row][col-i].type !== c_Block)
-	  board[row][col-i] = fire(col-i, row, c_FireLeft);
-	// go right
-	i = 1;
-	while (i<halfway && board[row][col+i].type !== c_Block) {
-		board[row][col+i] = fire(col+i, row, c_FireMiddleH);
-		i++;
-	}
-	if (board[row][col+i].type !== c_Block)
-	  board[row][col+i] = fire(col+i, row, c_FireRight);
-	// go up
-	i = 1;
-	while (i<halfway && board[row-i][col].type !== c_Block) {
-		board[row-i][col] = fire(col, row-i, c_FireMiddleV);
-		i++;
-	}
-	if (board[row-i][col].type !== c_Block)
-	  board[row-i][col] = fire(col, row-i, c_FireUp);
-	// go down
-	i = 1;
-	while (i<halfway && board[row+i][col].type !== c_Block) {
-		board[row+i][col] = fire(col, row+i, c_FireMiddleV);
-		i++;
-	}
-	if (board[row+i][col].type !== c_Block)
-	  board[row+i][col] = fire(col, row+i, c_FireDown);
+	addFire(0, -1, c_FireMiddleH, c_FireLeft);
+	addFire(0, +1, c_FireMiddleH, c_FireRight);
+	addFire(-1, 0, c_FireMiddleV, c_FireUp);
+	addFire(+1, 0, c_FireMiddleV, c_FireDown);
 	// cross
     board[row][col] = fire(col, row, c_FireCross);
 }
@@ -649,7 +706,7 @@ document.addEventListener('keyup', function(event) {
 
 var  lastloop = null;
 
-const demoTime = 12*1000; //ms
+const demoTime = 20*1000; //ms
 var demoCtr = 0;
 
 var elBombman = document.getElementById('bomberman');
