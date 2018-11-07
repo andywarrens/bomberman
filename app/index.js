@@ -31,8 +31,21 @@ const c_FireLeft = 0, c_FireRight = 1, c_FireUp = 2
 	 ,c_FireCross = 6;
 const c_Speed = 0.1, c_MaxSpeed = 2;
 const c_KeyList = 
-	[ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' 
-	 ,'Control' ];
+	[ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' ,'ControlRight'
+	, 'KeyA', 'KeyD', 'KeyW', 'KeyS' ,'KeyF' ];
+const c_Left=0, c_Right=1, c_Up=2, c_Down=3, c_BombKey=4;
+const player1keys = new Array(5),
+	  player2keys = new Array(5);
+player1keys[c_Left] = c_KeyList[0];
+player1keys[c_Right] = c_KeyList[1];
+player1keys[c_Up] = c_KeyList[2];
+player1keys[c_Down] = c_KeyList[3];
+player1keys[c_BombKey] = c_KeyList[4];
+player2keys[c_Left] = c_KeyList[5];
+player2keys[c_Right] = c_KeyList[6];
+player2keys[c_Up] = c_KeyList[7];
+player2keys[c_Down] = c_KeyList[8];
+player2keys[c_BombKey] = c_KeyList[9];
 
 // time, offsetX, offsetY, width, height
 const fireKeyframes = new Array(6); //7 possible fire animations, each 4 frames
@@ -101,8 +114,9 @@ var actor = function(type, x, y) {
 	   	,x:x*c_Blocksize
 		,y:y*c_Blocksize
 	    ,isDrawn : false }}
-   ,player = function(x, y) {
+   ,player = function(x, y, keyConfig) {
 	   var p = actor(c_Player, x, y);
+	   p.keyConfig = keyConfig;
 	   p.speed = 0;
 	   p.time = 0;
 	   p.moveAnimSpeed = 1000/15;
@@ -153,7 +167,7 @@ var actor = function(type, x, y) {
 		   bombCtr--; 
 		   myBomb.bombStrength = p.bombStrength;
 	   }
-	   const dropBomb = function() {
+	   p.dropBomb = function() {
 	     if (bombCtr < maxBombs) {
 			 const moPlayer = {
 				 x: Math.floor((p.img.getX() + p.width/2) / c_Blocksize)
@@ -163,7 +177,7 @@ var actor = function(type, x, y) {
 			 bombCtr++;
 		 }
 	   }
-	   eventManager.subscribe(ev_BombKey, dropBomb);
+	   //eventManager.subscribe(ev_BombKey, dropBomb);
 
 	   // animation
 	   const deadKeyframe = [ [   0,  3, 75, 19, 26 ]
@@ -193,23 +207,25 @@ var actor = function(type, x, y) {
 	   }
 	   return p; }
    ,calcMovement = function(player) {
+	  const conf = player.keyConfig;
 	  var dx = 0, dy = 0;
-	  var valueH = keysDown[c_KeyList[0]] === true ? -1 : 1
-		 ,valueV = keysDown[c_KeyList[2]] === true ? -1 : 1;
-	  if (keysDown[c_KeyList[0]] === true
-	     || keysDown[c_KeyList[1]] === true) {
+	  var valueH = keysDown[conf[c_Left]] === true ? -1 : 1
+		 ,valueV = keysDown[conf[c_Up]] === true ? -1 : 1;
+	  if (keysDown[conf[c_Left]] === true
+	     || keysDown[conf[c_Right]] === true) {
 		dx = valueH*player.speed; 
 	  } 
-	  if (keysDown[c_KeyList[2]] === true
-	     || keysDown[c_KeyList[3]] === true) {
+	  if (keysDown[conf[c_Up]] === true
+	     || keysDown[conf[c_Down]] === true) {
 		dy = valueV*player.speed; 
 	  }
 	  return { x: dx, y: dy }; }
    ,calcSpeed = function(player) {
-		var anyKeyDown = keysDown[c_KeyList[0]] 
-		   || keysDown[c_KeyList[1]] 
-		   || keysDown[c_KeyList[2]] 
-		   || keysDown[c_KeyList[3]]
+	    const conf = player.keyConfig;
+		var anyKeyDown = keysDown[conf[c_Left]] 
+		   || keysDown[conf[c_Right]] 
+		   || keysDown[conf[c_Up]] 
+		   || keysDown[conf[c_Down]]
 	    var speed = 
 		   anyKeyDown ? Math.min(player.speed + c_Speed
 			                    ,c_MaxSpeed)
@@ -382,7 +398,6 @@ var actor = function(type, x, y) {
 	;
 
 const ev_KeyPressed = 0, ev_BombKey = 1;
-const c_Left=0, c_Right=1, c_Up=2, c_Down=3;
 const eventManager = (function() {
   var my = {}
      ,observers = [];
@@ -399,13 +414,18 @@ const eventManager = (function() {
 })();
    
 var game = {
-	 state  : c_Playing
-	,debug  : false
-	,player : player(1,1) 
-	,board  : buildInitialBoard() }
+	 state   : c_Playing
+	,debug   : false
+	,players : [ player(1, 1, player1keys)
+			   , player(7, 1, player2keys) ]
+	,board   : buildInitialBoard() }
 
 
 // View
+const renderPlayers = function(stage, layer, players) {
+	for (var i=0, n=players.length; i<n; i++)
+		renderBombman(stage, layer, players[i]);
+}
 var renderBombman = function(stage, layer, bombman) {
   if (bombman.isDrawn === false) { 
     layer.add(bombman.img);
@@ -483,6 +503,43 @@ var updateBombman = function (dt, bombman) {
 	}
 	return bombman;
 }
+
+const updatePlayer = function(player, board) {
+  if (player.isAlive === true) {
+	  player.speed = calcSpeed(player);
+	  const oldPos = {
+		   x: player.img.getX()
+		  ,y: player.img.getY() }
+		,movement = calcMovement(player)
+		//,movement = getDebugMovement(oldPos.x, oldPos.y)
+		,newPos = {
+		   x: oldPos.x + movement.x
+		  ,y: oldPos.y + movement.y }
+		,validPos = getValidPos(board, player, oldPos, newPos);
+	  player.direction = calcDirection(oldPos, validPos);
+	  player.img.setX(validPos.x);
+	  player.img.setY(validPos.y);
+	  player = updateBombman(dt, player);
+
+	  //check if player wants to drop a bomb
+	  if (keysDown[player.keyConfig[c_BombKey]])
+		  player.dropBomb();
+
+	  // check if player is hit by fire
+	  const pcol = Math.floor(validPos.x / c_Blocksize)
+		   ,prow =  Math.floor(validPos.y / c_Blocksize)
+		   ,blocks = getBlocksUnderneathPlayer(board, validPos, player)
+		   ,playerRect = player.getRect(validPos);
+	   var i=0, n=blocks.length;
+	   while (i<n && blocks[i].type !== c_Fire)
+		   i++;
+	   if (i!==n)
+		 player.isAlive = false;
+  } else {
+	  player.update(dt); // update dead animation
+  } 
+}
+
 const getBlocksUnderneathPlayer = 
 	function(board, pos, player) {
 	   const tl = { x: Math.floor(pos.x / c_Blocksize)
@@ -505,7 +562,7 @@ const updateBoard = function(board, dt) {
 			var myBomb = board[i][j];
 		    myBomb.update(dt);
 			if (myBomb.isExploded) {
-			   addExplosion(game.board, j, i, myBomb.bombStrength);
+			   addExplosion(board, j, i, myBomb.bombStrength);
 			}
 			break;
 		  case c_Fire:
@@ -559,16 +616,9 @@ const addExplosion = function(board, col, row, range) {
 //  - events
 var keysDown = {}; //this map allows to handle multikey press
 window.addEventListener('keydown', function(event) {
-  const keyName = event.key;
+  const keyName = event.code;
   keysDown[keyName] = true;
-  if (keysDown[c_KeyList[0]] === true) 
-    eventManager.raiseEvent(ev_KeyPressed, [c_Left, -1]);
-  if (keysDown[c_KeyList[1]] === true) 
-    eventManager.raiseEvent(ev_KeyPressed, [c_Right, 1]);
-  if (keysDown[c_KeyList[2]] === true) 
-    eventManager.raiseEvent(ev_KeyPressed, [c_Up, -1]);
-  if (keysDown[c_KeyList[3]] === true) 
-    eventManager.raiseEvent(ev_KeyPressed, [c_Down, 1]);
+
   if (keysDown[c_KeyList[4]] === true) 
     eventManager.raiseEvent(ev_BombKey);
 
@@ -578,7 +628,7 @@ window.addEventListener('keydown', function(event) {
   }	
 }, false);
 document.addEventListener('keyup', function(event) {
-  const keyName = event.key;
+  const keyName = event.code;
   keysDown[keyName] = false;
 
   //Debug
@@ -617,46 +667,20 @@ var update = function(timestamp) {
 
   // DRAW
   renderBoard(stage, boardLayer, game.board);
-  renderBombman(stage, playerLayer, game.player);
+  renderPlayers(stage, playerLayer, game.players);
 
   // UPDATE
   // update board
   updateBoard(game.board, dt);
 	
   // update player pos
-  if (game.player.isAlive === true) {
-	  game.player.speed = calcSpeed(game.player);
-	  const oldPos = {
-		   x: game.player.img.getX()
-		  ,y: game.player.img.getY() }
-		,movement = calcMovement(game.player)
-		//,movement = getDebugMovement(oldPos.x, oldPos.y)
-		,newPos = {
-		   x: oldPos.x + movement.x
-		  ,y: oldPos.y + movement.y }
-		,validPos = getValidPos(game.board, game.player, oldPos, newPos);
-	  game.player.direction = calcDirection(oldPos, validPos);
-	  game.player.img.setX(validPos.x);
-	  game.player.img.setY(validPos.y);
-	  game.player = updateBombman(dt, game.player);
+  for (var i=0, n=game.players.length; i<n; i++) {
+	  updatePlayer(game.players[i], game.board);
+  }
 
-	  // check if player is hit by fire
-	  const pcol = Math.floor(validPos.x / c_Blocksize)
-		   ,prow =  Math.floor(validPos.y / c_Blocksize)
-		   ,blocks = getBlocksUnderneathPlayer(game.board, validPos, game.player)
-		   ,playerRect = game.player.getRect(validPos);
-	   var i=0, n=blocks.length;
-	   while (i<n && blocks[i].type !== c_Fire)
-		   i++;
-	   if (i!==n)
-		 game.player.isAlive = false;
 
-	  if (game.debug === true) 
-		  renderDebugCollision(blocks);
-  } else {
-	  game.player.update(dt); // update dead animation
-  } 
-
+  //if (game.debug === true) 
+	  //renderDebugCollision(blocks);
   if (demoCtr !== -1) {
 	if (demoCtr > demoTime) {
 	  game.state = c_Paused;
