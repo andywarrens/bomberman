@@ -107,11 +107,15 @@ var buildInitialBoard = function() {
 	//board[1][5] = fire(5, 1, c_FireEnd, c_FireRight);
 	
 	//bricks
-	var bricks = [ 3,1, 3,2, 3,3, 6,3, 5,4, 6,4 ];
+	var bricks = [ 3,1, 3,2, 6,3, 5,4, 6,4, 6,5 ];
 	for (var i=0, n=bricks.length; i<n; i+=2) {
 		var col = bricks[i], row = bricks[i+1];
 		board[row][col] = brick(col, row);
 	}
+
+	//bomb
+	board[5][3] = bomb(3,5, 1500, function(){});
+
 	return board;
 }
 
@@ -128,7 +132,7 @@ var actor = function(type, x, y) {
 	   p.speed = 0;
 	   p.time = 0;
 	   p.moveAnimSpeed = 1000/15;
-	   p.bombStrength = 5;
+	   p.bombStrength = 2;
 	   p.sprite = 0; 
 	   p.img = null;
 	   p.imgLoaded = false;
@@ -294,11 +298,11 @@ var actor = function(type, x, y) {
 	   // time, offsetX, offsetY, width, height
 	   const keyframes = [ [   0, 63, 48, 15, 15 ]
 	                              ,[   1, 79, 48, 15, 15 ] 
-	                              ,[ 250, 94, 48, 15, 15 ] 
-	                              ,[ 500,109, 48, 15, 15 ] 
-	                              ,[ 750,124, 48, 15, 15 ] 
-	                              ,[1000,139, 48, 15, 15 ] 
-	                              ,[1250,154, 48, 15, 15 ] ]
+	                              ,[ 100, 94, 48, 15, 15 ] 
+	                              ,[ 200,109, 48, 15, 15 ] 
+	                              ,[ 300,124, 48, 15, 15 ] 
+	                              ,[ 400,139, 48, 15, 15 ] 
+	                              ,[ 500,154, 48, 15, 15 ] ]
 	   const scaledH = c_Blocksize
 		    ,scaledW = c_Blocksize;
 	   b.width = scaledW;
@@ -329,7 +333,7 @@ var actor = function(type, x, y) {
 		 } else {
 		   sprite++;
 		   if (sprite === keyframes.length) {
-			   nextFrameTime = 250; // leave last sprite 250ms
+			   nextFrameTime = 100; // leave last sprite 250ms
 		   } else {
 			   nextFrameTime = keyframes[sprite][0];
 			   b.img.crop({
@@ -345,7 +349,7 @@ var actor = function(type, x, y) {
     ,bomb = function(x, y, idle, onExplode) {
 	   var b = actor(c_Bomb, x, y);
 	   b.isExploded = false;
-	   b.bombStrength = 1;
+	   b.bombStrength = 3;
 	   // sprite
 	   var offsetX = 3, offsetY = 108, next = 20
 	       ,width = 17, height = 19
@@ -634,11 +638,9 @@ const updateBoard = function(board, dt) {
 	}
 }
 const addExplosion = function(board, col, row, range) {
-    const halfway = Math.floor(0.5*range);
-
 	const addFire = function(rowInc, colInc, firemiddle, fireend) {
 		var i = 1;
-		while (i<=halfway && 
+		while (i<=range && 
 			[c_Block, c_Brick].indexOf(
 				board[row+rowInc*i][col+colInc*i].type)
 			  === -1) {
@@ -647,19 +649,21 @@ const addExplosion = function(board, col, row, range) {
 		  i++;
 		}
 		// if the fire encountered a brick, break it
-		if (i<=halfway) {
+		if (i<=range) {
 			var el = board[row+rowInc*i][col+colInc*i];
 			if (el.type === c_Brick) {
-			  console.log('brick found', row+rowInc*i, col+colInc*i);
 			  board[row+rowInc*i][col+colInc*i].break();
 			}
 		}
 		// if it was a full explosion
 		//  give the last block an 'end' image
-		var el = board[row+rowInc*i][col+colInc*i];
-		if (el.type !== c_Block && el.type !== c_Brick)
-		  board[row+rowInc*i][col+colInc*i] = 
-			fire(col+i*colInc, row+i*rowInc, fireend);
+		if (i === range+1) {
+			i--;
+			var el = board[row+rowInc*i][col+colInc*i];
+			if (el.type !== c_Block && el.type !== c_Brick)
+			  board[row+rowInc*i][col+colInc*i] = 
+				fire(col+i*colInc, row+i*rowInc, fireend);
+		}
 	}
 	// go left
 	addFire(0, -1, c_FireMiddleH, c_FireLeft);
