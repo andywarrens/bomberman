@@ -114,7 +114,11 @@ var buildInitialBoard = function() {
 	}
 
 	//bomb
-	board[5][3] = bomb(3,5, 1500, function(){});
+	var bombs = [ 4,1 , 1,8 ];
+	for (var i=0, n=bombs.length; i<n; i+=2) {
+		var col = bombs[i], row = bombs[i+1];
+		//board[row][col] = bomb(col, row, 750, function(){});
+	}
 
 	return board;
 }
@@ -151,13 +155,13 @@ var actor = function(type, x, y) {
 		            , animOptions.height ]
 	   var offsetX = 6, offsetY = 70, next = 20
 	       ,width = 18, height = 26
-		   ,scaledH = c_Blocksize
+		   ,scaledH = c_Blocksize*0.9
 		   ,scaledW = scaledH * (width/height);
 	   p.width = scaledW;
 	   p.height = scaledH;
 	   
 	   // place player on middle of starting block
-	   p.y = p.y - (0.05*c_Blocksize);
+	   p.y = p.y + 0.5*(c_Blocksize-scaledH);
 
 	   // collision
 	   p.isAlive = true;
@@ -539,9 +543,9 @@ const eventManager = (function() {
    
 var game = {
 	 state   : c_Playing
-	,debug   : false
+	,debug   : !false
 	,players : [ player(1, 1, player1keys)
-			   , player(8, 1, player2keys) ]
+			   , player(6, 2, player2keys) ]
 	,board   : buildInitialBoard() }
 
 
@@ -625,17 +629,14 @@ const updatePlayer = function(player, board, dt) {
 	  // check if player is hit by fire
 	  const pcol = Math.floor(validPos.x / c_Blocksize)
 		   ,prow =  Math.floor(validPos.y / c_Blocksize)
-		   ,blocks = getBlocksUnderneathPlayer(board, validPos, player)
-		   ,playerRect = player.getRect(validPos);
+		   ,blocks = getBlocksUnderneathPlayer(board, validPos, player);
 	   var i=0, n=blocks.length;
 	   while (i<n && blocks[i].type !== c_Fire)
 		   i++;
 	   if (i!==n)
 		 player.isAlive = false;
 
-	   if (game.debug === true) {
-	       renderDebugCollision(blocks, player.keyConfig === player1keys);
-	   }
+	  renderDebugCollision(blocks, player.keyConfig === player1keys, game.debug);
 	  } else {
 	    player.update(dt);
 	  }
@@ -769,17 +770,21 @@ const stage = new Konva.Stage({
 stage.add(boardLayer, playerLayer, debugLayer);
 
 var update = function(timestamp) {
-  dt = timestamp - lastloop;
+  if (lastloop === null)
+    dt = 16.6;
+  else
+	dt = timestamp - lastloop;
 
   // DRAW
   renderBoard(stage, boardLayer, game.board);
   for (var i=0, n=game.players.length; i<n; i++)
     renderBombman(stage, playerLayer, game.players[i]);
 
+
   // UPDATE
   // update board
   updateBoard(game.board, dt);
-	
+
   // update player 
   for (var i=0, n=game.players.length; i<n; i++) {
 	  updatePlayer(game.players[i], game.board, dt);
@@ -843,10 +848,12 @@ const toKonvaRect = function(rect) { return new Konva.Rect({
 			  stroke: 'red',
 			  strokeWidth: 1
 	 })};
-const renderDebugCollision = function(rects, shouldDestroy) {
-	if (shouldDestroy) debugLayer.destroyChildren();
-	for (var i=0, n=rects.length; i<n; i++)
-	  debugLayer.add(toKonvaRect(rects[i]));
+const renderDebugCollision = function(rects, shouldDestroy, isDebug) {
+	if (shouldDestroy || !isDebug) debugLayer.destroyChildren();
+	if (isDebug) {
+		for (var i=0, n=rects.length; i<n; i++)
+		  debugLayer.add(toKonvaRect(rects[i]));
+	}
 	debugLayer.draw();
 }
 
