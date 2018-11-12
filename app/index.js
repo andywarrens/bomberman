@@ -551,9 +551,8 @@ var renderBombman = function(stage, layer, bombman) {
     layer.add(bombman.img);
     bombman.isDrawn == true;
   }
-  if (bombman.isFinished === true) {
-	layer.remove(bombman.img);
-  }
+  if (bombman.isFinished === true)
+	bombman.img.remove();
 
   if (!bombman.isAlive)
 	 bombman.img.image(c_Images[c_BombImg]); // bad name
@@ -774,8 +773,7 @@ var update = function(timestamp) {
 
   // DRAW
   renderBoard(stage, boardLayer, game.board);
-  //for (var i=0, n=game.players.length; i<n; i++)
-  for (var i=0, n=1; i<n; i++)
+  for (var i=0, n=game.players.length; i<n; i++)
     renderBombman(stage, playerLayer, game.players[i]);
 
   // UPDATE
