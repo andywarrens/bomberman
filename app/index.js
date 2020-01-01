@@ -82,7 +82,7 @@ fireKeyframes[c_FireCross]   = [ [ 0  ,  3, 159, 20, 20 ]
 var imgLoadCtr = 0;
 const c_Images = [ loadImage("img/sprites.png")
 				 , loadImage("img/sprites2.png") 
-				 , loadImage("img/bricks.png") ]
+				 , loadImage("img/block.png") ]
      ,c_PlayerImg=0, c_BombImg=1, c_BrickImg=2;
 var buildInitialBoard = function() {
 	// init array
@@ -859,9 +859,12 @@ const renderDebugCollision = function(rects, shouldDestroy, isDebug) {
 
 // Start
 var waitWhileLoading = function() {
+	console.log('loading images', imgLoadCtr, ' / ', c_Images.length);
 	if (imgLoadCtr < c_Images.length) {
 		window.setTimeout(waitWhileLoading, 200);
 	 } else {
+		console.log('images loaded');
+		printKeyboardInstructions();
 		window.requestAnimationFrame(update);
 //addExplosion(game.board, 3, 4, 5);
 //addExplosion(game.board, 6, 7, 5);
@@ -870,4 +873,13 @@ var waitWhileLoading = function() {
 //renderBoard(stage, boardLayer, game.board);
 	 }
 }
+
+function printKeyboardInstructions() {
+	console.log('Available keys:');
+	console.log('P(ause), D(ebug)');
+	const n = c_KeyList.length;
+	for (var i=0; i<n; i++)
+		console.log('- (Player' + (i < n/2 ? '1' : '2') + ')', c_KeyList[i]);
+}
 waitWhileLoading();
+console.log('game-script loaded');
