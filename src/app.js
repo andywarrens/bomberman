@@ -1,3 +1,5 @@
+import Konva from 'konva';
+
 // Helper
 const diff = function(x1, x2) { return Math.abs(x1-x2); }
 const rectCollision = function(r1, r2) {

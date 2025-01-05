@@ -1,4 +1,6 @@
-lib
+dist/
+.parcel-cache/
+node_modules
 
 # elm-package generated files
 elm-stuff
@@ -10,4 +12,3 @@ repl-temp-*
 
 # Vim
 *.swp
-node_modules
