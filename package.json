@@ -1,6 +1,7 @@
 {
   "name": "bomberman-js",
   "version": "1.0.1",
+  "type": "module",
   "description": "andy's attempt at bomberman in the browser",
   "scripts": {
     "start": "parcel src/index.html"

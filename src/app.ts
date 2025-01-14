@@ -27,11 +27,12 @@ const renderEmptySquare = function(x,y) { return new Konva.Rect({
 						,width: c_Blocksize, height: c_Blocksize
 					    ,fill: 'white' }) };
 const c_Blocks = 15, c_Blocksize = 26, c_Boardsize = c_Blocks * c_Blocksize;
-const c_FireBegin = 0, c_FireMiddle = 1, c_FireEnd = 2;
+
 const c_FireLeft = 0, c_FireRight = 1, c_FireUp = 2
 	 ,c_FireDown = 3, c_FireMiddleH = 4, c_FireMiddleV = 5
 	 ,c_FireCross = 6;
-const c_Speed = 0.1, c_MaxSpeed = 2;
+
+const c_MaxSpeed = 2;
 const c_KeyList = 
 	[ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' ,'ControlRight'
 	, 'KeyA', 'KeyD', 'KeyW', 'KeyS' ,'KeyF' ];
@@ -50,42 +51,43 @@ player2keys[c_Down] = c_KeyList[8];
 player2keys[c_BombKey] = c_KeyList[9];
 
 // time, offsetX, offsetY, width, height
-const fireKeyframes = new Array(6); //7 possible fire animations, each 4 frames
-fireKeyframes[c_FireLeft] = [ [ 0  , 91, 160, 18, 20 ]
+const fireKeyframes = { //7 possible fire animations, each 4 frames
+  c_FireLeft: [ [ 0  , 91, 160, 18, 20 ]
 						,[ 250,111, 160, 19, 20 ] 
 						,[ 500,132, 160, 18, 20 ]
-						,[ 750,154, 160, 18, 20 ] ]
-fireKeyframes[c_FireRight]= [ [ 0  ,  3, 229, 19, 20 ]
+						,[ 750,154, 160, 18, 20 ] ],
+  c_FireRight:[ [ 0  ,  3, 229, 19, 20 ]
 						,[ 250, 23, 229, 19, 20 ] 
 						,[ 500, 44, 229, 20, 20 ]
-						,[ 750, 67, 229, 20, 20 ] ]
-fireKeyframes[c_FireUp]   = [ [ 0  ,  1, 184, 16, 20 ]
+						,[ 750, 67, 229, 20, 20 ] ],
+  c_FireUp: [ [ 0  ,  1, 184, 16, 20 ]
 						,[ 250, 15, 184, 17, 20 ] 
 						,[ 500, 33, 184, 20, 20 ]
-						,[ 750, 55, 184, 20, 20 ] ]
-fireKeyframes[c_FireDown] = [ [ 0  ,  1, 204, 16, 20 ]
+						,[ 750, 55, 184, 20, 20 ] ],
+  c_FireDown: [ [ 0  ,  1, 204, 16, 20 ]
 						     ,[ 250, 15, 204, 17, 20 ] 
 						     ,[ 500, 33, 204, 20, 20 ]
-						     ,[ 750, 55, 204, 20, 20 ] ]
-fireKeyframes[c_FireMiddleH] = [ [ 0  , 77, 204, 20, 20 ]
+						     ,[ 750, 55, 204, 20, 20 ] ],
+  c_FireMiddleH: [ [ 0  , 77, 204, 20, 20 ]
 						   ,[ 250, 99, 204, 20, 20 ] 
 						   ,[ 500,121, 204, 20, 20 ]
-						   ,[ 750,143, 204, 20, 20 ] ]
-fireKeyframes[c_FireMiddleV]   = [ [ 0  , 86, 229, 17, 20 ]
+						   ,[ 750,143, 204, 20, 20 ] ],
+  c_FireMiddleV: [ [ 0  , 86, 229, 17, 20 ]
 						   ,[ 250,102, 229, 15, 20 ] 
 						   ,[ 500,119, 229, 20, 20 ]
-						   ,[ 750,141, 229, 20, 20 ] ]
-fireKeyframes[c_FireCross]   = [ [ 0  ,  3, 159, 20, 20 ]
+						   ,[ 750,141, 229, 20, 20 ] ],
+  c_FireCross:  [ [ 0  ,  3, 159, 20, 20 ]
 						   ,[ 250, 25, 159, 20, 20 ] 
 						   ,[ 500, 47, 159, 20, 20 ]
-						   ,[ 750, 69, 159, 20, 20 ] ]
+						   ,[ 750, 69, 159,  20, 20 ] ]
+};
 
 // load first
 var imgLoadCtr = 0;
 const c_Images = [ loadImage("img/sprites.png")
 				 , loadImage("img/sprites2.png") 
 				 , loadImage("img/block.png") ]
-     ,c_PlayerImg=0, c_BombImg=1, c_BrickImg=2;
+     ,c_BombImg=1, c_BrickImg=2;
 var buildInitialBoard = function() {
 	// init array
     const board = new Array(c_Blocks);
@@ -333,29 +335,38 @@ var actor = function(type, x, y) {
 	   return (i!==n) ? oldPos : newPos;
 	}
    ,emptyBlock = function(x, y) {
-	   var b = actor(c_Empty, x, y);
-	   b.width = b.height = c_Blocksize
-	   b.render = function() { return renderEmptySquare(b.x, b.y); }
+	   var b = {
+		 ...actor(c_Empty, x, y),
+	     width: c_Blocksize,
+		 height: c_Blocksize,
+		 render: function() { return renderEmptySquare(b.x, b.y); }
+	   }
 	   return b;
    }
    ,block = function(x, y) {
-	   var b = actor(c_Block, x, y);
-	   b.img = "img/block.png";
-	   b.width = c_Blocksize;
-	   b.height = c_Blocksize;
-	   var rect = new Konva.Rect({
+	   var rect;
+	   var b = {
+		...actor(c_Block, x, y),
+	    width: c_Blocksize,
+	    height: c_Blocksize,
+	    render: function() { return rect; }
+	   }
+	   rect = new Konva.Rect({
 			  x: b.x, y: b.y,
-			  width: b.width, height: b.height,
+			  width: c_Blocksize, height: c_Blocksize,
 			  fill: 'green',
 			  stroke: 'black',
 			  strokeWidth: 1
 			});
-	   b.render = function() { return rect; }
+;
 	   return b; }
     ,brick = function(x, y) {
-	   var b = actor(c_Brick, x, y);
-	   b.img = "img/bricks.png";
-	   b.isDestroyed = false;
+	   var b = {
+		...actor(c_Brick, x, y),
+	//    b.img = "img/bricks.png";
+	    img: "img/block.png",
+	    isDestroyed: false,
+	   };
 	   // time, offsetX, offsetY, width, height
 	   const keyframes = [ [   0, 63, 48, 15, 15 ]
 	                              ,[   1, 79, 48, 15, 15 ] 
