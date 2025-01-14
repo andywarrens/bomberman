@@ -1,0 +1,8 @@
+{
+  "include": ["src/**/*", "./eslint.config.mts"],
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "strict": true,
+    "noImplicitAny": true
+  }
+}

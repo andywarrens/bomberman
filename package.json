@@ -4,7 +4,8 @@
   "type": "module",
   "description": "andy's attempt at bomberman in the browser",
   "scripts": {
-    "start": "parcel src/index.html"
+    "start": "parcel src/index.html",
+    "eslint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -18,7 +19,13 @@
     "konva": "^9.3.18"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.6",
+    "eslint": "^9.18.0",
+    "jiti": "^2.4.2",
     "parcel": "^2.13.3",
-    "parcel-reporter-static-files-copy": "^1.5.3"
+    "parcel-reporter-static-files-copy": "^1.5.3",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
   }
 }
