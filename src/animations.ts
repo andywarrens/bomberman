@@ -1,5 +1,5 @@
 import * as R from "rambda";
-import { Bomb, Brick, Direction, Fire, Player } from "./game";
+import { Actor, Bomb, Direction } from "./game";
 import { c_FrameDuration } from "./constants";
 import { Animatable } from "./engine.js";
 
@@ -153,73 +153,10 @@ const calculateSpriteIxToShow = function (animation: Animatable): number {
   return currentSprite_ix;
 };
 
-export const updateBrickAnimation = function (b: Brick, dtGame: number) {
-  b.animation.dt += dtGame;
-  b.animation.currentSprite_ix = calculateSpriteIxToShow(b.animation);
-};
-
-// walking animation, or hit by bomb animation
-export const updatePlayerAnimation = function (p: Player, dtGame: number) {
-  p.animation.dt += dtGame;
-  p.animation.currentSprite_ix = calculateSpriteIxToShow(p.animation);
-};
-//   var animTimer = 0,
-//     currentSprite = 0,
-//     nextFrameTime = deadKeyframe[currentSprite + 1][0];
-//   p.update = function (dt) {
-//     if (animTimer === 0) {
-//       p.keyframe = [
-//         deadKeyframe[currentSprite][1],
-//         deadKeyframe[currentSprite][2],
-//         deadKeyframe[currentSprite][3],
-//         deadKeyframe[currentSprite][4],
-//       ];
-//     }
-//     animTimer += dt;
-//     if (animTimer < nextFrameTime) return;
-//     if (currentSprite === deadKeyframe.length) {
-//       p.isFinished = true;
-//     } else {
-//       currentSprite++;
-//       if (currentSprite === deadKeyframe.length) {
-//         nextFrameTime = 250; // leave last sprite 250ms
-//       } else {
-//         nextFrameTime = deadKeyframe[currentSprite][0];
-//         p.keyframe = [
-//           deadKeyframe[currentSprite][1],
-//           deadKeyframe[currentSprite][2],
-//           deadKeyframe[currentSprite][3],
-//           deadKeyframe[currentSprite][4],
-//         ];
-//       }
-//     }
-//   };
-
-/*
- * player walking animation
- */
-//   var walkTimer = 0,
-//     sprite = 0;
-//   const walkSpeed = 50;
-//   p.animate = function (dt) {
-//     if (p.speed.x === 0 && p.speed.y === 0) {
-//       walkTimer = 0;
-//       return p.keyframe;
-//     } else {
-//       walkTimer += dt;
-//       if (walkTimer >= walkSpeed) {
-//         walkTimer = 0;
-//         sprite++;
-//         if (sprite === 7) sprite = 0;
-//       }
-//       return [
-//         keyframes[p.direction].x + sprite * animOptions.next,
-//         keyframes[p.direction].y,
-//         animOptions.width,
-//         animOptions.height,
-//       ];
-//     }
-//   };
+export const generalUpdateAnimation = function(a: Actor & { animation: Animatable }, dtGame: number) {
+  a.animation.dt += dtGame;
+  a.animation.currentSprite_ix = calculateSpriteIxToShow(a.animation);
+}
 
 /**
  * Bomb idle / exploding animation
@@ -231,12 +168,4 @@ export const updateBombAnimation = function (b: Bomb, dtGame: number) {
       : bombAnimation.explodeKeyframes;
   b.animation.dt += dtGame;
   b.animation.currentSprite_ix = calculateSpriteIxToShow(b.animation);
-};
-
-export const updateFireAnimation = function (
-  { animation }: Fire,
-  dtGame: number
-) {
-  animation.dt += dtGame;
-  animation.currentSprite_ix = calculateSpriteIxToShow(animation);
 };

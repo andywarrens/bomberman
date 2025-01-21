@@ -1,5 +1,6 @@
+import * as R from "rambda";
 import { playerSizing, RenderLayers } from "./draw.js";
-import { BombermanState, Brick } from "./game.js";
+import { Actor, BombermanState } from "./game.js";
 import { c_Blocksize_px } from "./constants.js";
 import Konva from "konva";
 
@@ -195,19 +196,12 @@ const gameloop: GameLoop<BombermanState> = (
       el.konva.isAddedToLayer = true;
     }
     // TODO: does this separation (board/movable) still makes sense?
-    // update animation of relevant board actors
-    for (const el of game.boardActors.filter((x) => x.type === "brick" && x.isDestroyed) as Brick[]) {
-      (el.konva.konvaObject as Konva.Image)
-        .crop({
-          x: el.animation.keyFrames[el.animation.currentSprite_ix][0],
-          y: el.animation.keyFrames[el.animation.currentSprite_ix][1],
-          width: el.animation.keyFrames[el.animation.currentSprite_ix][2],
-          height: el.animation.keyFrames[el.animation.currentSprite_ix][3],
-        })
-        .cache();
-    }
-    // update animations of all movable actors
-    for (const el of game.movableActors.filter((x) => 'animation' in x)) {
+    // update animation of relevant actors
+    const animatableActors = R.concat(
+      game.boardActors.filter((x) => x.type === "brick" && x.isDestroyed) as (Actor & { animation: Animatable })[],
+      game.movableActors as (Actor & { animation: Animatable })[],
+    )
+    for (const el of animatableActors) {
       (el.konva.konvaObject as Konva.Image)
         .crop({
           x: el.animation.keyFrames[el.animation.currentSprite_ix][0],

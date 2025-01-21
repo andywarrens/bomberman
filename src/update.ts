@@ -1,11 +1,9 @@
 import * as R from "rambda";
 import {
+  generalUpdateAnimation,
   playerAnimations,
   PlayerDirection,
   updateBombAnimation,
-  updateBrickAnimation,
-  updateFireAnimation,
-  updatePlayerAnimation,
 } from "./animations";
 import {
   c_Blocksize_px,
@@ -191,7 +189,7 @@ export function updatePlayer(
           : "down_right";
       player.animation.keyFrames =
         playerAnimations.walking[movingDirectionDpad];
-      updatePlayerAnimation(player, dt);
+      generalUpdateAnimation(player, dt);
     }
 
     //check if player wants and can drop a bomb
@@ -226,7 +224,7 @@ export function updatePlayer(
     }
   } else {
     player.animation.keyFrames = playerAnimations.dead;
-    updatePlayerAnimation(player, dt);
+    generalUpdateAnimation(player, dt);
     if (player.animation.dt > playerAnimations.dead.length * 250) {
       player.konva.konvaObject.destroy();
       gameState.movableActors = R.without([player], gameState.movableActors);
@@ -260,7 +258,7 @@ export const updateBricks = function (
   );
 
   active.forEach((b) => {
-    updateBrickAnimation(b, dt);
+    generalUpdateAnimation(b, dt);
   });
 
   exploded.forEach((el) => {
@@ -312,7 +310,7 @@ export function updateFires(gameState: BombermanState, dt: number): void {
   );
 
   active.forEach((f) => {
-    updateFireAnimation(f, dt);
+    generalUpdateAnimation(f, dt);
   });
 
   exploded.forEach((f) => {
