@@ -3,6 +3,9 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "strict": true,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    // "module": "NodeNext", // which module system you're using such as commonjs for Node or ES module 
+    // "target": "ES2022", // which version of ECMAScript you're using to code
+    // "moduleResolution": "nodenext"
   }
 }

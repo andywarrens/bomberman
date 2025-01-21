@@ -1575,6 +1575,7 @@ __metadata:
     konva: "npm:^9.3.18"
     parcel: "npm:^2.13.3"
     parcel-reporter-static-files-copy: "npm:^1.5.3"
+    rambda: "npm:^9.4.2"
     typescript: "npm:^5.7.3"
     typescript-eslint: "npm:^8.20.0"
   languageName: unknown
@@ -3260,6 +3261,13 @@ __metadata:
   version: 1.2.3
   resolution: "queue-microtask@npm:1.2.3"
   checksum: 10c0/900a93d3cdae3acd7d16f642c29a642aea32c2026446151f0778c62ac089d4b8e6c986811076e1ae180a694cedf077d453a11b58ff0a865629a4f82ab558e102
+  languageName: node
+  linkType: hard
+
+"rambda@npm:^9.4.2":
+  version: 9.4.2
+  resolution: "rambda@npm:9.4.2"
+  checksum: 10c0/ee32773c7ef7a281782cf2e09cd0f2dbb67facf59924042e861ef42f166eb081c92e55ed6bd1a7c5c1a937831227bea16b9c11680bc9d57b4b8cb29ca78241ac
   languageName: node
   linkType: hard
 
