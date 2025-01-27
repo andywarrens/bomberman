@@ -1,7 +1,5 @@
-# Getting started
-```
-yarn            # install dependencies
-yarn start      # start parcel web server
-```
+This repo contains a simple version of the Bomberman game written in a few languages for me to learn game development / programming languages  a bit:
 
-gf it doesn't start up, there's probably a problem compiling Typescript (e.g. due to warnings which are swallowed). comment out the file, start up, then uncomment and bomberman works.
+1. ts/ folder: Typescript + Konva.js
+2. haskell/ folder: Haskell + Graphics.Gloss
+3. webgl/ folder: Typescript + Three.js
