@@ -1,6 +1,10 @@
+# Node, Parcel
 dist/
 .parcel-cache/
 node_modules
+
+# Haskell
+dist-newstyle/
 
 # elm-package generated files
 elm-stuff
@@ -12,3 +16,4 @@ repl-temp-*
 
 # Vim
 *.swp
+
